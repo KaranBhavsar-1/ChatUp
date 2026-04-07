@@ -1,4 +1,5 @@
 import express from 'express';
+import cookieParser from "cookie-parser";
 import path from "path";
 
 import authRoutes from "./routes/auth.route.js"
@@ -13,7 +14,7 @@ const PORT = ENV.PORT || 3000
 // const NODE_ENV = ENV.NODE_ENV
 
 app.use(express.json()) //under request.body
-
+app.use(cookieParser())
 app.use("/api/auth" , authRoutes)
 app.use("/api/message" , messageRoutes)
 
