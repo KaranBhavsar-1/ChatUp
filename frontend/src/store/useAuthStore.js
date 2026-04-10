@@ -6,6 +6,7 @@ export const useAuthStore = create((set) => ({
   authUser: null,
   isCheckingAuth: true,
   isSigningUp: false,
+  isLogginIn: false,
 
   checkAuth: async () => {
     try {
@@ -19,22 +20,6 @@ export const useAuthStore = create((set) => ({
       set({ isCheckingAuth: false });
     }
   },
-
-  // signUp : async (data) => {
-  //   set({isSigningUp:true})
-  //   try {
-  //           const res = await axiosInstance.post("/auth/signup",data);
-  //           set({authUser: res.data})
-
-  //           toast.success("Account created succesfully!")
-
-  //   } catch (error) {
-  //     toast.error(error.res.data.message)
-  //   }finally{
-  //   set({isSigningUp:false })
-
-  //   }
-  // }
 
   signup: async (data) => {
     set({ isSigningUp: true });
@@ -51,4 +36,36 @@ export const useAuthStore = create((set) => ({
       set({ isSigningUp: false });
     }
   },
+
+  login: async (data) => {
+    set({ isLogginIn: true });
+    try {
+      // console.log("data in Signup = ", data);
+      const res = await axiosInstance.post("/auth/login", data);
+      set({ authUser: res.data });
+
+      toast.success("Account Logged in successfully!");
+      get().connectSocket();
+    } catch (error) {
+      toast.error(error.response.data.message);
+    } finally {
+      set({ isLogginIn: false });
+    }
+  },
+
+  logout: async () => {
+    try {
+      await axiosInstance.post("/auth/logout")
+      set({authUser:null})
+      toast.success("Logged Out successfully")
+    } catch (error) {
+      toast.error("Error Logging out")
+      console.log("Error in loggingout: ",  error)
+    }
+  }
+
 }));
+
+// Test accoutn
+// poser@GamepadDirectional.com 
+// 
