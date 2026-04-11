@@ -12,6 +12,7 @@ export const useChatStore = create((set, get) => ({
   isUsersLoading: false,
   isMessagesLoading: false,
   isSoundEnabled: JSON.parse(localStorage.getItem("isSoundEnabled")) === true,
+  unreadMessages: {},
 
   toggleSound: () => {
     localStorage.setItem("isSoundEnabled", !get().isSoundEnabled);
@@ -19,7 +20,13 @@ export const useChatStore = create((set, get) => ({
   },
 
   setActiveTab: (tab) => set({ activeTab: tab }),
-  setSelectedUser: (selectedUser) => set({ selectedUser }),
+  // setSelectedUser: (selectedUser) => set({ selectedUser }),
+  setSelectedUser: (user) => {
+  set({ selectedUser: user });
+
+  // clear unread messages when opening chat
+  get().clearUnread(user._id);
+},
 
   getAllContacts: async () => {
     set({ isUsersLoading: true });
@@ -93,24 +100,54 @@ export const useChatStore = create((set, get) => ({
 
     const socket = useAuthStore.getState().socket;
 
+    // socket.on("newMessage", (newMessage) => {
+    //   const isMessageSentFromSelectedUser = newMessage.senderId === selectedUser._id;
+    //   if (!isMessageSentFromSelectedUser) return;
+
+    //   const currentMessages = get().messages;
+    //   set({ messages: [...currentMessages, newMessage] });
+
+    //   if (isSoundEnabled) {
+    //     const notificationSound = new Audio("/sounds/notification.mp3");
+
+    //     notificationSound.currentTime = 0; // reset to start
+    //     notificationSound.play().catch((e) => console.log("Audio play failed:", e));
+    //   }
+    // });
+
     socket.on("newMessage", (newMessage) => {
-      const isMessageSentFromSelectedUser = newMessage.senderId === selectedUser._id;
-      if (!isMessageSentFromSelectedUser) return;
+  const { selectedUser } = get();
 
-      const currentMessages = get().messages;
-      set({ messages: [...currentMessages, newMessage] });
-
-      if (isSoundEnabled) {
-        const notificationSound = new Audio("/sounds/notification.mp3");
-
-        notificationSound.currentTime = 0; // reset to start
-        notificationSound.play().catch((e) => console.log("Audio play failed:", e));
-      }
-    });
+  if (selectedUser?._id === newMessage.senderId) {
+    // user is currently in chat → show message
+    set((state) => ({
+      messages: [...state.messages, newMessage],
+    }));
+  } else {
+    // user NOT in chat → increase unread count
+    get().incrementUnread(newMessage.senderId);
+  }
+});
   },
 
   unsubscribeFromMessages: () => {
     const socket = useAuthStore.getState().socket;
     socket.off("newMessage");
   },
+
+  incrementUnread: (senderId) =>
+  set((state) => ({
+    unreadMessages: {
+      ...state.unreadMessages,
+      [senderId]: (state.unreadMessages[senderId] || 0) + 1,
+    },
+  })),
+
+  clearUnread: (userId) =>
+  set((state) => {
+    const updated = { ...state.unreadMessages };
+    delete updated[userId];
+    return { unreadMessages: updated };
+  }),
+
 }));
