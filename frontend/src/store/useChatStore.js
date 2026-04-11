@@ -127,6 +127,13 @@ export const useChatStore = create((set, get) => ({
     // user NOT in chat → increase unread count
     get().incrementUnread(newMessage.senderId);
   }
+
+  if (isSoundEnabled) {
+        const notificationSound = new Audio("/sounds/notification.mp3");
+
+        notificationSound.currentTime = 0; // reset to start
+        notificationSound.play().catch((e) => console.log("Audio play failed:", e));
+      }
 });
   },
 
