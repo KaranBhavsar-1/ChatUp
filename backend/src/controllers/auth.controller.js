@@ -67,9 +67,12 @@ export const signup = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error!" });
   }
 };
-
 export const login = async (req, res) => {
   const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: "Email and password are required" });
+  }
 
   try {
     const user = await User.findOne({ email });
@@ -77,8 +80,7 @@ export const login = async (req, res) => {
     // never tell client which one is incorrect: passwords or email
 
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
-    if (!isPasswordCorrect)
-      return res.status(400).json({ message: "Invalid credentials!" });
+    if (!isPasswordCorrect) return res.status(400).json({ message: "Invalid credentials!" });
 
     generateToken(user._id, res);
 
@@ -93,9 +95,11 @@ export const login = async (req, res) => {
     res.status(500).json({ messsage: "Internal server error" });
   }
 };
+
+
 export const logout = (_, res) => {
   res.cookie("jwt", token, {
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    maxAge:0,
     httpOnly: true,
     secure: true,
     sameSite: "None",

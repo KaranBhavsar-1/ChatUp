@@ -54,7 +54,10 @@ const PORT = ENV.PORT || 3000;
 app.use(express.json({ limit: "5mb" })); // req.body
 // app.use(cors({ origin: ENV.CLIENT_URL, credentials: true }));
 app.use(
-  cors({ origin: "https://chatup-1-a7zk.onrender.com", credentials: true }),
+  cors({ 
+    // origin: "https://chatup-1-a7zk.onrender.com", 
+    origin: "https://chatup-1-a7zk.onrender.com",
+    credentials: true }),
 );
 
 app.use(cookieParser());
