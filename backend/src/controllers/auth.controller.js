@@ -94,8 +94,8 @@ export const login = async (req, res) => {
   }
 };
 export const logout = (_, res) => {
-  res.cookie("jwt", "", {
-    maxAge: 0,
+  res.cookie("jwt", token, {
+    maxAge: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true,
     secure: true,
     sameSite: "None",

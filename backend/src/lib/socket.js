@@ -55,8 +55,8 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     // origin: [ENV.CLIENT_URL],
-    // origin: "https://chatup-1-a7zk.onrender.com",
-    origin: "https://chatup-mz5r.onrender.com",
+    origin: "https://chatup-1-a7zk.onrender.com",
+    // origin: "https://chatup-mz5r.onrender.com",
 
     credentials: true,
   },

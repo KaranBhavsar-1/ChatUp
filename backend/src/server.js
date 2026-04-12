@@ -21,7 +21,7 @@
 // app.use("/api/auth" , authRoutes)
 // app.use("/api/messages" , messageRoutes)
 
-// // make ready for deployment 
+// // make ready for deployment
 // if(ENV.NODE_ENV === "production") {
 //     app.use(express.static(path.join(__dirname,"../frontend/dist")));
 
@@ -53,7 +53,9 @@ const PORT = ENV.PORT || 3000;
 
 app.use(express.json({ limit: "5mb" })); // req.body
 // app.use(cors({ origin: ENV.CLIENT_URL, credentials: true }));
-app.use(cors({ origin: "https://chatup-1-a7zk.onrender.com" , credentials: true }));
+app.use(
+  cors({ origin: "https://chatup-1-a7zk.onrender.com", credentials: true }),
+);
 
 app.use(cookieParser());
 
