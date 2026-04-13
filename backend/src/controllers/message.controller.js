@@ -72,6 +72,11 @@ export const sendMessage = async (req, res) => {
     const receiverSocketId = getReceiverSocketId(receiverId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("newMessage", newMessage);
+      console.log("receiver id in backend message controller: " , receiverId)
+      console.log("new message in backend message controller: " , newMessage)
+    }else {
+       console.log("receiver id in backend message controller: " , receiverId)
+      console.log("new message in backend message controller: " , newMessage)
     }
 
     res.status(201).json(newMessage);
