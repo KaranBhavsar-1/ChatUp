@@ -69,9 +69,13 @@ export const useChatStore = create((set, get) => ({
   sendMessage: async (messageData) => {
     const { selectedUser, messages } = get();
     const { authUser } = useAuthStore.getState();
-
+    const { socket} = get();
     const tempId = `temp-${Date.now()}`;
 
+    socket.emit("sendMessage", {
+  ...messageData,
+  receiverId: selectedUser._id,
+});
     const optimisticMessage = {
       _id: tempId,
       senderId: authUser._id,
@@ -97,6 +101,7 @@ export const useChatStore = create((set, get) => ({
   subscribeToMessages: () => {
     const { selectedUser, isSoundEnabled } = get();
     if (!selectedUser) return;
+    
 
     const socket = useAuthStore.getState().socket;
 

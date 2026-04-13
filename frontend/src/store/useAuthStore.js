@@ -81,6 +81,7 @@ import { io } from "socket.io-client";
 
 // const BASE_URL = "https://chatup-1-a7zk.onrender.com"
 const BASE_URL = "https://chatup-mz5r.onrender.com/api"
+// const BASE_URL = "https://chatup-mz5r.onrender.com"
 export const useAuthStore = create((set, get) => ({
   authUser: null,
   isCheckingAuth: true,
@@ -169,8 +170,8 @@ export const useAuthStore = create((set, get) => ({
     set({ socket });
 
     // listen for online users event
-    socket.on("getOnlineUsers", (userIds) => {
-      set({ onlineUsers: userIds });
+    socket.on("getOnlineUsers", (userId) => {
+      set({ onlineUsers: userId });
     });
   },
 
