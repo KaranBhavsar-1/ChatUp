@@ -123,7 +123,7 @@ export const useAuthStore = create((set, get) => ({
     try {
       const res = await axiosInstance.post("/auth/login", data);
       set({ authUser: res.data });
-
+      console.log("the frontend / useauthstore / res.data: " , res.data)
       toast.success("Logged in successfully");
 
       get().connectSocket();
@@ -160,7 +160,7 @@ export const useAuthStore = create((set, get) => ({
   connectSocket: () => {
     const { authUser } = get();
     if (!authUser || get().socket?.connected) return;
-
+    console.log("authUser in connect socket / useauthstore = ", authUser)
     const socket = io(BASE_URL, {
       withCredentials: true, // this ensures cookies are sent with the connection
     });
@@ -176,6 +176,7 @@ export const useAuthStore = create((set, get) => ({
   },
 
   disconnectSocket: () => {
+    console.log("in disconnect socket!")
     if (get().socket?.connected) get().socket.disconnect();
   },
 }));

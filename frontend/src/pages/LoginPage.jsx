@@ -10,7 +10,7 @@ function LoginPage() {
   
     const handleSubmit = (e) => {
       e.preventDefault();
-        // console.log("formdata   = ",formData);
+        console.log("formdata in login.jsx page  = ",formData);
   
       login(formData);
     };
