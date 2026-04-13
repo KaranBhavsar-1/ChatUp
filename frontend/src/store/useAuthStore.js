@@ -80,8 +80,8 @@ import { io } from "socket.io-client";
 // const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:3000" : "https://chatup-1-a7zk.onrender.com/";
 
 // const BASE_URL = "https://chatup-1-a7zk.onrender.com"
-const BASE_URL = "https://chatup-mz5r.onrender.com/api"
-// const BASE_URL = "https://chatup-mz5r.onrender.com"
+// const BASE_URL = "https://chatup-mz5r.onrender.com/api"
+const BASE_URL = "https://chatup-mz5r.onrender.com"
 export const useAuthStore = create((set, get) => ({
   authUser: null,
   isCheckingAuth: true,
