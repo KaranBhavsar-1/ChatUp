@@ -1,87 +1,10 @@
-// import { create } from "zustand";
-// import { axiosInstance } from "../lib/axios";
-// import toast from "react-hot-toast";
-
-// export const useAuthStore = create((set) => ({
-//   authUser: null,
-//   isCheckingAuth: true,
-//   isSigningUp: false,
-//   isLoggingIn: false,
-//   onlineUsers: [],
-
-//   checkAuth: async () => {
-//     try {
-//       const res = await axiosInstance.get("/auth/check");
-//       set({ authUser: res.data });
-//       // get().connectSocket();
-//     } catch (error) {
-//       console.log("Error in authCheck:", error);
-//       set({ authUser: null });
-//     } finally {
-//       set({ isCheckingAuth: false });
-//     }
-//   },
-
-//   signup: async (data) => {
-//     set({ isSigningUp: true });
-//     try {
-//       // console.log("data in Signup = ", data);
-//       const res = await axiosInstance.post("/auth/signup", data);
-//       set({ authUser: res.data });
-
-//       toast.success("Account created successfully!");
-//       get().connectSocket();
-//     } catch (error) {
-//       toast.error(error.response.data.message);
-//     } finally {
-//       set({ isSigningUp: false });
-//     }
-//   },
-
-//   login: async (data) => {
-//     set({ isLoggingIn: true });
-//     try {
-//       // console.log("data in Signup = ", data);
-//       const res = await axiosInstance.post("/auth/login", data);
-//       set({ authUser: res.data });
-
-//       toast.success("Account Logged in successfully!");
-//       get().connectSocket();
-//     } catch (error) {
-//       toast.error(error.response.data.message);
-//     } finally {
-//       set({ isLoggingIn: false });
-//     }
-//   },
-
-//   logout: async () => {
-//     try {
-//       await axiosInstance.post("/auth/logout")
-//       set({authUser:null})
-//       toast.success("Logged Out successfully")
-//     } catch (error) {
-//       toast.error("Error Logging out")
-//       console.log("Error in loggingout: ",  error)
-//     }
-//   }
-
-// }));
-
-// // Test accoutn
-// // poser@GamepadDirectional.com 
-// // 
-
-
 import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
 
-// const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:3000" : "https://chatup-1-a7zk.onrender.com/";
+const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:3000" : "/";
 
-// const BASE_URL = "https://chatup-1-a7zk.onrender.com"
-// const BASE_URL = "https://chatup-mz5r.onrender.com/api"
-const BASE_URL = "https://chatup-mz5r.onrender.com"
 export const useAuthStore = create((set, get) => ({
   authUser: null,
   isCheckingAuth: true,
@@ -123,7 +46,7 @@ export const useAuthStore = create((set, get) => ({
     try {
       const res = await axiosInstance.post("/auth/login", data);
       set({ authUser: res.data });
-      console.log("the frontend / useauthstore / res.data: " , res.data)
+
       toast.success("Logged in successfully");
 
       get().connectSocket();
@@ -160,7 +83,7 @@ export const useAuthStore = create((set, get) => ({
   connectSocket: () => {
     const { authUser } = get();
     if (!authUser || get().socket?.connected) return;
-    console.log("authUser in connect socket / useauthstore = ", authUser)
+
     const socket = io(BASE_URL, {
       withCredentials: true, // this ensures cookies are sent with the connection
     });
@@ -170,13 +93,12 @@ export const useAuthStore = create((set, get) => ({
     set({ socket });
 
     // listen for online users event
-    socket.on("getOnlineUsers", (userId) => {
-      set({ onlineUsers: userId });
+    socket.on("getOnlineUsers", (userIds) => {
+      set({ onlineUsers: userIds });
     });
   },
 
   disconnectSocket: () => {
-    console.log("in disconnect socket!")
     if (get().socket?.connected) get().socket.disconnect();
   },
 }));

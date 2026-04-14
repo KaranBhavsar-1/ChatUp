@@ -12,7 +12,6 @@ export const useChatStore = create((set, get) => ({
   isUsersLoading: false,
   isMessagesLoading: false,
   isSoundEnabled: JSON.parse(localStorage.getItem("isSoundEnabled")) === true,
-  unreadMessages: {},
 
   toggleSound: () => {
     localStorage.setItem("isSoundEnabled", !get().isSoundEnabled);
@@ -20,13 +19,7 @@ export const useChatStore = create((set, get) => ({
   },
 
   setActiveTab: (tab) => set({ activeTab: tab }),
-  // setSelectedUser: (selectedUser) => set({ selectedUser }),
-  setSelectedUser: (user) => {
-  set({ selectedUser: user });
-
-  // clear unread messages when opening chat
-  get().clearUnread(user._id);
-},
+  setSelectedUser: (selectedUser) => set({ selectedUser }),
 
   getAllContacts: async () => {
     set({ isUsersLoading: true });
@@ -43,11 +36,8 @@ export const useChatStore = create((set, get) => ({
     set({ isUsersLoading: true });
     try {
       const res = await axiosInstance.get("/messages/chats");
-      console.log("chat partner here",res);
       set({ chats: res.data });
     } catch (error) {
-      console.log("chat partner nigga here",error);
-
       toast.error(error.response.data.message);
     } finally {
       set({ isUsersLoading: false });
@@ -69,13 +59,9 @@ export const useChatStore = create((set, get) => ({
   sendMessage: async (messageData) => {
     const { selectedUser, messages } = get();
     const { authUser } = useAuthStore.getState();
-    // const { socket} = get();
+
     const tempId = `temp-${Date.now()}`;
 
-//     socket.emit("sendMessage", {
-//   ...messageData,
-//   receiverId: selectedUser._id,
-// });
     const optimisticMessage = {
       _id: tempId,
       senderId: authUser._id,
@@ -102,64 +88,26 @@ export const useChatStore = create((set, get) => ({
     const { selectedUser, isSoundEnabled } = get();
     if (!selectedUser) return;
 
-
     const socket = useAuthStore.getState().socket;
 
-    // socket.on("newMessage", (newMessage) => {
-    //   const isMessageSentFromSelectedUser = newMessage.senderId === selectedUser._id;
-    //   if (!isMessageSentFromSelectedUser) return;
-
-    //   const currentMessages = get().messages;
-    //   set({ messages: [...currentMessages, newMessage] });
-
-    //   if (isSoundEnabled) {
-    //     const notificationSound = new Audio("/sounds/notification.mp3");
-
-    //     notificationSound.currentTime = 0; // reset to start
-    //     notificationSound.play().catch((e) => console.log("Audio play failed:", e));
-    //   }
-    // });
-
     socket.on("newMessage", (newMessage) => {
-  const { selectedUser } = get();
+      const isMessageSentFromSelectedUser = newMessage.senderId === selectedUser._id;
+      if (!isMessageSentFromSelectedUser) return;
 
-  if (selectedUser?._id === newMessage.senderId) {
-    // user is currently in chat → show message
-    set((state) => ({
-      messages: [...state.messages, newMessage],
-    }));
-  } else {
-    // user NOT in chat → increase unread count
-    get().incrementUnread(newMessage.senderId);
-  }
+      const currentMessages = get().messages;
+      set({ messages: [...currentMessages, newMessage] });
 
-  if (isSoundEnabled) {
+      if (isSoundEnabled) {
         const notificationSound = new Audio("/sounds/notification.mp3");
 
         notificationSound.currentTime = 0; // reset to start
         notificationSound.play().catch((e) => console.log("Audio play failed:", e));
       }
-});
+    });
   },
 
   unsubscribeFromMessages: () => {
     const socket = useAuthStore.getState().socket;
     socket.off("newMessage");
   },
-
-  incrementUnread: (senderId) =>
-  set((state) => ({
-    unreadMessages: {
-      ...state.unreadMessages,
-      [senderId]: (state.unreadMessages[senderId] || 0) + 1,
-    },
-  })),
-
-  clearUnread: (userId) =>
-  set((state) => {
-    const updated = { ...state.unreadMessages };
-    delete updated[userId];
-    return { unreadMessages: updated };
-  }),
-
 }));
