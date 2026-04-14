@@ -1,41 +1,3 @@
-// import express from 'express';
-// import cookieParser from "cookie-parser";
-// import path from "path";
-// import cors from "cors"
-
-// import authRoutes from "./routes/auth.route.js"
-// import messageRoutes from "./routes/message.route.js"
-// import { connectDB } from './lib/db.js';
-// import { ENV } from './lib/env.js';
-// import { app } from './lib/socket.js';
-
-// // const app = express();
-// const __dirname = path.resolve();
-
-// const PORT = ENV.PORT || 3000
-// // const NODE_ENV = ENV.NODE_ENV
-
-// app.use(express.json()) //under request.body
-// app.use(cors({origin:ENV.CLIENT_URL,credentials:true}))
-// app.use(cookieParser())
-// app.use("/api/auth" , authRoutes)
-// app.use("/api/messages" , messageRoutes)
-
-// // make ready for deployment
-// if(ENV.NODE_ENV === "production") {
-//     app.use(express.static(path.join(__dirname,"../frontend/dist")));
-
-//     app.get("*",(_,res)=>{
-//         // res.sendFile(path.join(__dirname,"../frontend","dist", "index.html"));
-//         res.sendFile(path.join(__dirname,"../frontend", "dist","index.html"));
-//     })
-// }
-
-// app.listen(PORT, ()=> {
-//     console.log("Server running on port " + PORT)
-//     connectDB();
-// });
-
 import express from "express";
 import cookieParser from "cookie-parser";
 import path from "path";
@@ -51,17 +13,8 @@ const __dirname = path.resolve();
 
 const PORT = ENV.PORT || 3000;
 
-app.set("trust proxy", 1);
-
 app.use(express.json({ limit: "5mb" })); // req.body
-// app.use(cors({ origin: ENV.CLIENT_URL, credentials: true }));
-app.use(
-  cors({ 
-    // origin: "https://chatup-1-a7zk.onrender.com", 
-    origin: "https://chatup-1-a7zk.onrender.com",
-    credentials: true }),
-);
-
+app.use(cors({ origin: ENV.CLIENT_URL, credentials: true }));
 app.use(cookieParser());
 
 app.use("/api/auth", authRoutes);
