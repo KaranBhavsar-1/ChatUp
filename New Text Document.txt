@@ -1,0 +1,830 @@
+error:-
+Access to XMLHttpRequest at 'https://chatup-mz5r.onrender.com/socket.io/?EIO=4&transport=polling&t=hgozqs58' from origin 'https://chatup-1-a7zk.onrender.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+index-X3eEbZqz.js:195 
+ GET https://chatup-mz5r.onrender.com/socket.io/?EIO=4&transport=polling&t=hgozqs58 net::ERR_FAILED 502 (Bad Gateway)
+index-X3eEbZqz.js:195 Uncaught TypeError: Cannot read properties of undefined (reading '69d65194c44a8815958c4bb9')
+    at index-X3eEbZqz.js:195:54175
+    at Array.map (<anonymous>)
+    at yl (index-X3eEbZqz.js:195:53574)
+    at V (index-X3eEbZqz.js:8:47521)
+    at _c (index-X3eEbZqz.js:8:69988)
+    at Nc (index-X3eEbZqz.js:8:80249)
+    at Mu (index-X3eEbZqz.js:8:115603)
+    at ku (index-X3eEbZqz.js:8:114684)
+    at Ou (index-X3eEbZqz.js:8:114522)
+    at gu (index-X3eEbZqz.js:8:111387)
+
+Backend link:- https://chatup-mz5r.onrender.com
+frontend link:-https://chatup-1-a7zk.onrender.com/
+
+code:-
+Backend:-
+
+server.js:-
+import express from "express";
+import cookieParser from "cookie-parser";
+import path from "path";
+import cors from "cors";
+
+import authRoutes from "./routes/auth.route.js";
+import messageRoutes from "./routes/message.route.js";
+import { connectDB } from "./lib/db.js";
+import { ENV } from "./lib/env.js";
+import { app, server } from "./lib/socket.js";
+
+const __dirname = path.resolve();
+
+const PORT = ENV.PORT || 3000;
+
+app.use(express.json({ limit: "5mb" })); // req.body
+app.use(cors({ origin: ENV.CLIENT_URL, credentials: true }));
+app.use(cookieParser());
+
+app.use("/api/auth", authRoutes);
+app.use("/api/messages", messageRoutes);
+
+// make ready for deployment
+if (ENV.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname, "../frontend/dist")));
+
+  app.get("*", (_, res) => {
+    res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
+  });
+}
+
+server.listen(PORT, () => {
+  console.log("Server running on port: " + PORT);
+  connectDB();
+});
+
+authroute.js:-
+import express from "express";
+import { signup, login, logout, updateProfile } from "../controllers/auth.controller.js";
+import { protectRoute } from "../middleware/auth.middleware.js";
+import { arcjetProtection } from "../middleware/arcjet.middleware.js";
+
+const router = express.Router();
+
+router.use(arcjetProtection);
+
+router.post("/signup", signup);
+router.post("/login", login);
+router.post("/logout", logout);
+
+router.put("/update-profile", protectRoute, updateProfile);
+
+router.get("/check", protectRoute, (req, res) => res.status(200).json(req.user));
+
+export default router;
+
+message.route.js:-
+import express from "express";
+import {
+  getAllContacts,
+  getChatPartners,
+  getMessagesByUserId,
+  sendMessage,
+} from "../controllers/message.controller.js";
+import { protectRoute } from "../middleware/auth.middleware.js";
+import { arcjetProtection } from "../middleware/arcjet.middleware.js";
+
+const router = express.Router();
+
+// the middlewares execute in order - so requests get rate-limited first, then authenticated.
+// this is actually more efficient since unauthenticated requests get blocked by rate limiting before hitting the auth middleware.
+router.use(arcjetProtection, protectRoute);
+
+router.get("/contacts", getAllContacts);
+router.get("/chats", getChatPartners);
+router.get("/:id", getMessagesByUserId);
+router.post("/send/:id", sendMessage);
+
+export default router;
+
+auth.controller.js:-
+import { sendWelcomeEmail } from "../emails/emailHandlers.js";
+import { generateToken } from "../lib/utils.js";
+import User from "../models/User.js";
+import bcrypt from "bcryptjs";
+import { ENV } from "../lib/env.js";
+import cloudinary from "../lib/cloudinary.js";
+
+export const signup = async (req, res) => {
+  const { fullName, email, password } = req.body;
+
+  try {
+    if (!fullName || !email || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    // check if emailis valid: regex
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    const user = await User.findOne({ email });
+    if (user) return res.status(400).json({ message: "Email already exists" });
+
+    // 123456 => $dnjasdkasj_?dmsakmk
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const newUser = new User({
+      fullName,
+      email,
+      password: hashedPassword,
+    });
+
+    if (newUser) {
+      // before CR:
+      // generateToken(newUser._id, res);
+      // await newUser.save();
+
+      // after CR:
+      // Persist user first, then issue auth cookie
+      const savedUser = await newUser.save();
+      generateToken(savedUser._id, res);
+
+      res.status(201).json({
+        _id: newUser._id,
+        fullName: newUser.fullName,
+        email: newUser.email,
+        profilePic: newUser.profilePic,
+      });
+
+      try {
+        await sendWelcomeEmail(savedUser.email, savedUser.fullName, ENV.CLIENT_URL);
+      } catch (error) {
+        console.error("Failed to send welcome email:", error);
+      }
+    } else {
+      res.status(400).json({ message: "Invalid user data" });
+    }
+  } catch (error) {
+    console.log("Error in signup controller:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const login = async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: "Email and password are required" });
+  }
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+    // never tell the client which one is incorrect: password or email
+
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+    if (!isPasswordCorrect) return res.status(400).json({ message: "Invalid credentials" });
+
+    generateToken(user._id, res);
+
+    res.status(200).json({
+      _id: user._id,
+      fullName: user.fullName,
+      email: user.email,
+      profilePic: user.profilePic,
+    });
+  } catch (error) {
+    console.error("Error in login controller:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const logout = (_, res) => {
+  res.cookie("jwt", "", { maxAge: 0 });
+  res.status(200).json({ message: "Logged out successfully" });
+};
+
+export const updateProfile = async (req, res) => {
+  try {
+    const { profilePic } = req.body;
+    if (!profilePic) return res.status(400).json({ message: "Profile pic is required" });
+
+    const userId = req.user._id;
+
+    const uploadResponse = await cloudinary.uploader.upload(profilePic);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { profilePic: uploadResponse.secure_url },
+      { new: true }
+    );
+
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    console.log("Error in update profile:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+message.controller.js:-
+import cloudinary from "../lib/cloudinary.js";
+import { getReceiverSocketId, io } from "../lib/socket.js";
+import Message from "../models/Message.js";
+import User from "../models/User.js";
+
+export const getAllContacts = async (req, res) => {
+  try {
+    const loggedInUserId = req.user._id;
+    const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } }).select("-password");
+
+    res.status(200).json(filteredUsers);
+  } catch (error) {
+    console.log("Error in getAllContacts:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getMessagesByUserId = async (req, res) => {
+  try {
+    const myId = req.user._id;
+    const { id: userToChatId } = req.params;
+
+    const messages = await Message.find({
+      $or: [
+        { senderId: myId, receiverId: userToChatId },
+        { senderId: userToChatId, receiverId: myId },
+      ],
+    });
+
+    res.status(200).json(messages);
+  } catch (error) {
+    console.log("Error in getMessages controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const sendMessage = async (req, res) => {
+  try {
+    const { text, image } = req.body;
+    const { id: receiverId } = req.params;
+    const senderId = req.user._id;
+
+    if (!text && !image) {
+      return res.status(400).json({ message: "Text or image is required." });
+    }
+    if (senderId.equals(receiverId)) {
+      return res.status(400).json({ message: "Cannot send messages to yourself." });
+    }
+    const receiverExists = await User.exists({ _id: receiverId });
+    if (!receiverExists) {
+      return res.status(404).json({ message: "Receiver not found." });
+    }
+
+    let imageUrl;
+    if (image) {
+      // upload base64 image to cloudinary
+      const uploadResponse = await cloudinary.uploader.upload(image);
+      imageUrl = uploadResponse.secure_url;
+    }
+
+    const newMessage = new Message({
+      senderId,
+      receiverId,
+      text,
+      image: imageUrl,
+    });
+
+    await newMessage.save();
+
+    const receiverSocketId = getReceiverSocketId(receiverId);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("newMessage", newMessage);
+    }
+
+    res.status(201).json(newMessage);
+  } catch (error) {
+    console.log("Error in sendMessage controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const getChatPartners = async (req, res) => {
+  try {
+    const loggedInUserId = req.user._id;
+
+    // find all the messages where the logged-in user is either sender or receiver
+    const messages = await Message.find({
+      $or: [{ senderId: loggedInUserId }, { receiverId: loggedInUserId }],
+    });
+
+    const chatPartnerIds = [
+      ...new Set(
+        messages.map((msg) =>
+          msg.senderId.toString() === loggedInUserId.toString()
+            ? msg.receiverId.toString()
+            : msg.senderId.toString()
+        )
+      ),
+    ];
+
+    const chatPartners = await User.find({ _id: { $in: chatPartnerIds } }).select("-password");
+
+    res.status(200).json(chatPartners);
+  } catch (error) {
+    console.error("Error in getChatPartners: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+auth.middleware.js:-
+import jwt from "jsonwebtoken";
+import User from "../models/User.js";
+import { ENV } from "../lib/env.js";
+
+export const protectRoute = async (req, res, next) => {
+  try {
+    const token = req.cookies.jwt;
+    if (!token) return res.status(401).json({ message: "Unauthorized - No token provided" });
+
+    const decoded = jwt.verify(token, ENV.JWT_SECRET);
+    if (!decoded) return res.status(401).json({ message: "Unauthorized - Invalid token" });
+
+    const user = await User.findById(decoded.userId).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    req.user = user;
+    next();
+  } catch (error) {
+    console.log("Error in protectRoute middleware:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+arcjet.middleware.js:-
+import aj from "../lib/arcjet.js";
+import { isSpoofedBot } from "@arcjet/inspect";
+
+export const arcjetProtection = async (req, res, next) => {
+  try {
+    const decision = await aj.protect(req);
+    if (decision.isDenied()) {
+      if (decision.reason.isRateLimit()) {
+        return res.status(429).json({ message: "Rate limit exceeded. please try again later." });
+      } else if (decision.reason.isBot()) {
+        // return res.status(403).json({ message: "Bot access denied!." });
+      } else {
+        return res.status(403).json({ message: "Access denied becase of Security Policy." });
+      }
+    }
+
+    if (decision.results.some(isSpoofedBot)){
+        return res.status(403).json({
+            error: "Spoof Bot detected!",    
+            maessage: "Bot access denied!."
+        });
+    }
+    next();
+  } catch (error) {
+    console.error("Arcjet Protection Error: ", error);
+    next();
+  }
+};
+
+socket.auth.middleware.js:-
+import jwt from "jsonwebtoken";
+import User from "../models/User.js";
+import { ENV } from "../lib/env.js";
+
+export const socketAuthMiddleware = async (socket, next) => {
+  try {
+    // extract token from http-only cookies
+    const token = socket.handshake.headers.cookie
+      ?.split("; ")
+      .find((row) => row.startsWith("jwt="))
+      ?.split("=")[1];
+
+    if (!token) {
+      console.log("Socket connection rejected: No token provided");
+      return next(new Error("Unauthorized - No Token Provided"));
+    }
+
+    // verify the token
+    const decoded = jwt.verify(token, ENV.JWT_SECRET);
+    if (!decoded) {
+      console.log("Socket connection rejected: Invalid token");
+      return next(new Error("Unauthorized - Invalid Token"));
+    }
+
+    // find the user fromdb
+    const user = await User.findById(decoded.userId).select("-password");
+    if (!user) {
+      console.log("Socket connection rejected: User not found");
+      return next(new Error("User not found"));
+    }
+
+    // attach user info to socket
+    socket.user = user;
+    socket.userId = user._id.toString();
+
+    console.log(
+      `Socket authenticated for user: ${user.fullName} (${user._id})`,
+    );
+
+    next();
+  } catch (error) {
+    console.log("Error in socket authentication:", error.message);
+    next(new Error("Unauthorized - Authentication failed"));
+  }
+};
+
+arcjet.js:-
+import arcjet, { shield, detectBot, slidingWindow } from "@arcjet/node";
+
+import { ENV } from "./env.js";
+
+const aj = arcjet({
+  key: ENV.ARCJET_KEY,
+  rules: [
+    // Shield protects your app from common attacks e.g. SQL injection
+    shield({ mode: "LIVE" }),
+    // Create a bot detection rule
+    detectBot({
+      mode: "LIVE", // Blocks requests. Use "DRY_RUN" to log only
+      // Block all bots except the following
+      allow: [
+        "CATEGORY:SEARCH_ENGINE", // Google, Bing, etc
+        // Uncomment to allow these other common bot categories
+        // See the full list at https://arcjet.com/bot-list
+        //"CATEGORY:MONITOR", // Uptime monitoring services
+        //"CATEGORY:PREVIEW", // Link previews e.g. Slack, Discord
+      ],
+    }),
+    // Create a token bucket rate limit. Other algorithms are supported.
+    slidingWindow({
+      mode: "LIVE", // Blocks requests. Use "DRY_RUN" to log only
+      max: 100,
+      interval: 60,
+    }),
+  ],
+});
+
+export default aj;
+
+socket.js:-
+import { Server } from "socket.io";
+import http from "http";
+import express from "express";
+import { ENV } from "./env.js";
+import { socketAuthMiddleware } from "../middleware/socket.auth.middleware.js";
+
+const app = express();
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: [ENV.CLIENT_URL],
+    credentials: true,
+  },
+});
+
+// apply authentication middleware to all socket connections
+io.use(socketAuthMiddleware);
+
+// we will use this function to check if the user is online or not
+export function getReceiverSocketId(userId) {
+  return userSocketMap[userId];
+}
+
+// this is for storig online users
+const userSocketMap = {}; // {userId:socketId}
+
+io.on("connection", (socket) => {
+  console.log("A user connected", socket.user.fullName);
+
+  const userId = socket.userId;
+  userSocketMap[userId] = socket.id;
+
+  // io.emit() is used to send events to all connected clients
+  io.emit("getOnlineUsers", Object.keys(userSocketMap));
+
+  // with socket.on we listen for events from clients
+  socket.on("disconnect", () => {
+    console.log("A user disconnected", socket.user.fullName);
+    delete userSocketMap[userId];
+    io.emit("getOnlineUsers", Object.keys(userSocketMap));
+  });
+});
+
+export { io, app, server };
+
+utils.js:-
+import jwt from "jsonwebtoken";
+import { ENV } from "./env.js";
+
+export const generateToken = (userId, res) => {
+  const { JWT_SECRET } = ENV;
+  if (!JWT_SECRET) {
+    throw new Error("JWT_SECRET is not configured");
+  }
+
+  const token = jwt.sign({ userId }, JWT_SECRET, {
+    expiresIn: "7d",
+  });
+
+  res.cookie("jwt", token, {
+    maxAge: 7 * 24 * 60 * 60 * 1000, // MS
+    httpOnly: true, // prevent XSS attacks: cross-site scripting
+    sameSite: "strict", // CSRF attacks
+    secure: ENV.NODE_ENV === "development" ? false : true,
+  });
+
+  return token;
+};
+
+// http://localhost
+// https://dsmakmk.com
+
+
+frontend:-
+App.jsx:-
+import { Navigate, Route, Routes } from "react-router";
+import ChatPage from "./pages/ChatPage";
+import LoginPage from "./pages/LoginPage";
+import SignUpPage from "./pages/SignUpPage";
+import { useEffect, useState } from "react";
+import { useAuthStore } from "./store/useAuthStore";
+import PageLoader from "./components/PageLoader";
+
+import {Toaster} from "react-hot-toast"
+
+function App() {
+  const {checkAuth,isCheckingAuth,authUser} = useAuthStore()
+
+  useEffect(()=>{
+    checkAuth()
+  },[checkAuth])
+
+  console.log({authUser})
+
+  if(isCheckingAuth) return <PageLoader />
+  return (
+    <div className="min-h-screen bg-slare-900 relative flex items-center justify-center p-4 overflow-hidden">
+
+   {/* DECORATORS - GRID BG & GLOW SHAPES */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px]" />
+      <div className="absolute top-0 -left-4 size-96 bg-pink-500 opacity-20 blur-[100px]" />
+      <div className="absolute bottom-0 -right-4 size-96 bg-cyan-500 opacity-20 blur-[100px]" />
+
+
+      <Routes>
+        <Route path="/" element={authUser ? <ChatPage /> : <Navigate to={"/login"}/>} />
+        <Route path="/login" element={!authUser ? <LoginPage />: <Navigate to={"/"}/>} />
+        <Route path="/signup" element={!authUser ?  <SignUpPage /> : <Navigate to={"/"}/>} />
+      </Routes>
+
+      <Toaster/>
+    </div>
+  );
+}
+
+export default App;
+
+useAuthStore.js:-
+import { create } from "zustand";
+import { axiosInstance } from "../lib/axios";
+import toast from "react-hot-toast";
+import { io } from "socket.io-client";
+
+// const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:3000" : "/";
+const BASE_URL = "https://chatup-mz5r.onrender.com"
+export const useAuthStore = create((set, get) => ({
+  authUser: null,
+  isCheckingAuth: true,
+  isSigningUp: false,
+  isLoggingIn: false,
+  socket: null,
+  onlineUsers: [],
+
+  checkAuth: async () => {
+    try {
+      const res = await axiosInstance.get("/auth/check");
+      set({ authUser: res.data });
+      get().connectSocket();
+    } catch (error) {
+      console.log("Error in authCheck:", error);
+      set({ authUser: null });
+    } finally {
+      set({ isCheckingAuth: false });
+    }
+  },
+
+  signup: async (data) => {
+    set({ isSigningUp: true });
+    try {
+      const res = await axiosInstance.post("/auth/signup", data);
+      set({ authUser: res.data });
+
+      toast.success("Account created successfully!");
+      get().connectSocket();
+    } catch (error) {
+      toast.error(error.response.data.message);
+    } finally {
+      set({ isSigningUp: false });
+    }
+  },
+
+  login: async (data) => {
+    set({ isLoggingIn: true });
+    try {
+      const res = await axiosInstance.post("/auth/login", data);
+      set({ authUser: res.data });
+
+      toast.success("Logged in successfully");
+
+      get().connectSocket();
+    } catch (error) {
+      toast.error(error.response.data.message);
+    } finally {
+      set({ isLoggingIn: false });
+    }
+  },
+
+  logout: async () => {
+    try {
+      await axiosInstance.post("/auth/logout");
+      set({ authUser: null });
+      toast.success("Logged out successfully");
+      get().disconnectSocket();
+    } catch (error) {
+      toast.error("Error logging out");
+      console.log("Logout error:", error);
+    }
+  },
+
+  updateProfile: async (data) => {
+    try {
+      const res = await axiosInstance.put("/auth/update-profile", data);
+      set({ authUser: res.data });
+      toast.success("Profile updated successfully");
+    } catch (error) {
+      console.log("Error in update profile:", error);
+      toast.error(error.response.data.message);
+    }
+  },
+
+  connectSocket: () => {
+    const { authUser } = get();
+    if (!authUser || get().socket?.connected) return;
+
+    const socket = io(BASE_URL, {
+      withCredentials: true, // this ensures cookies are sent with the connection
+    });
+
+    socket.connect();
+
+    set({ socket });
+
+    // listen for online users event
+    socket.on("getOnlineUsers", (userIds) => {
+      set({ onlineUsers: userIds });
+    });
+  },
+
+  disconnectSocket: () => {
+    if (get().socket?.connected) get().socket.disconnect();
+  },
+}));
+
+
+usechatstore.js:-
+import { create } from "zustand";
+import { axiosInstance } from "../lib/axios";
+import toast from "react-hot-toast";
+import { useAuthStore } from "./useAuthStore";
+
+export const useChatStore = create((set, get) => ({
+  allContacts: [],
+  chats: [],
+  messages: [],
+  activeTab: "chats",
+  selectedUser: null,
+  isUsersLoading: false,
+  isMessagesLoading: false,
+  isSoundEnabled: JSON.parse(localStorage.getItem("isSoundEnabled")) === true,
+
+  toggleSound: () => {
+    localStorage.setItem("isSoundEnabled", !get().isSoundEnabled);
+    set({ isSoundEnabled: !get().isSoundEnabled });
+  },
+
+  setActiveTab: (tab) => set({ activeTab: tab }),
+  setSelectedUser: (selectedUser) => set({ selectedUser }),
+
+  getAllContacts: async () => {
+    set({ isUsersLoading: true });
+    try {
+      const res = await axiosInstance.get("/messages/contacts");
+      set({ allContacts: res.data });
+    } catch (error) {
+      toast.error(error.response.data.message);
+    } finally {
+      set({ isUsersLoading: false });
+    }
+  },
+  getMyChatPartners: async () => {
+    set({ isUsersLoading: true });
+    try {
+      const res = await axiosInstance.get("/messages/chats");
+      set({ chats: res.data });
+    } catch (error) {
+      toast.error(error.response.data.message);
+    } finally {
+      set({ isUsersLoading: false });
+    }
+  },
+
+  getMessagesByUserId: async (userId) => {
+    set({ isMessagesLoading: true });
+    try {
+      const res = await axiosInstance.get(`/messages/${userId}`);
+      set({ messages: res.data });
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Something went wrong");
+    } finally {
+      set({ isMessagesLoading: false });
+    }
+  },
+
+  sendMessage: async (messageData) => {
+    const { selectedUser, messages } = get();
+    const { authUser } = useAuthStore.getState();
+
+    const tempId = `temp-${Date.now()}`;
+
+    const optimisticMessage = {
+      _id: tempId,
+      senderId: authUser._id,
+      receiverId: selectedUser._id,
+      text: messageData.text,
+      image: messageData.image,
+      createdAt: new Date().toISOString(),
+      isOptimistic: true, // flag to identify optimistic messages (optional)
+    };
+    // immidetaly update the ui by adding the message
+    set({ messages: [...messages, optimisticMessage] });
+
+    try {
+      const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, messageData);
+      set({ messages: messages.concat(res.data) });
+    } catch (error) {
+      // remove optimistic message on failure
+      set({ messages: messages });
+      toast.error(error.response?.data?.message || "Something went wrong");
+    }
+  },
+
+  subscribeToMessages: () => {
+    const { selectedUser, isSoundEnabled } = get();
+    if (!selectedUser) return;
+
+    const socket = useAuthStore.getState().socket;
+
+    socket.on("newMessage", (newMessage) => {
+      const isMessageSentFromSelectedUser = newMessage.senderId === selectedUser._id;
+      if (!isMessageSentFromSelectedUser) return;
+
+      const currentMessages = get().messages;
+      set({ messages: [...currentMessages, newMessage] });
+
+      if (isSoundEnabled) {
+        const notificationSound = new Audio("/sounds/notification.mp3");
+
+        notificationSound.currentTime = 0; // reset to start
+        notificationSound.play().catch((e) => console.log("Audio play failed:", e));
+      }
+    });
+  },
+
+  unsubscribeFromMessages: () => {
+    const socket = useAuthStore.getState().socket;
+    socket.off("newMessage");
+  },
+}));
+
+
+axios.js:-
+import axios from "axios";
+
+export const axiosInstance = axios.create({
+    // baseURL: import.meta.env.MODE === "development" ? "http://localhost:3000/api" : "/api",
+    // baseURL: import.meta.env.MODE === "development" ? "http://localhost:3000/api" : "https://chatup-mz5r.onrender.com/api",
+    baseURL: "https://chatup-mz5r.onrender.com/api",
+    withCredentials: true,
+})
+﻿
+why am i getting this error???
+and how can i solve it??
+make sure to tell me step by step in simple words
+u can take as much as time u want ,i have a lot of time here , i just want it to be done  accurately.
+
