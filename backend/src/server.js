@@ -26,6 +26,11 @@ app.get("/debug", (req, res) => {
   res.send(req.cookies);
 });
 
+app.get("/", (req, res) => {
+  res.send("NEW VERSION RUNNING");
+});
+
+
 // make ready for deployment
 if (ENV.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));
