@@ -17,6 +17,7 @@ export const generateToken = (userId, res) => {
     sameSite: "none", // CSRF attacks
     // secure: ENV.NODE_ENV === "development" ? false : true,
     secure: true,
+    domain: "chatup-mz5r.onrender.com",
   });
 
   return token;
