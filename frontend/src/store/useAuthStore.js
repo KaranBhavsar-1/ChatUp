@@ -30,6 +30,7 @@ export const useAuthStore = create((set, get) => ({
     set({ isSigningUp: true });
     try {
       const res = await axiosInstance.post("/auth/signup", data);
+      localStorage.setItem("token", res.data.token);
       set({ authUser: res.data });
 
       toast.success("Account created successfully!");
@@ -44,7 +45,8 @@ export const useAuthStore = create((set, get) => ({
   login: async (data) => {
     set({ isLoggingIn: true });
     try {
-      const res = await axiosInstance.post("/auth/login", data,{ withCredentials: true })
+      const res = await axiosInstance.post("/auth/login", data)
+      localStorage.setItem("token", res.data.token);
       set({ authUser: res.data });
       
       toast.success("Logged in successfully");
@@ -87,11 +89,12 @@ export const useAuthStore = create((set, get) => ({
     // const socket = io(BASE_URL, {
     //   withCredentials: true, // this ensures cookies are sent with the connection
     // });
+    const token = localStorage.getItem("token");
 
     const socket = io(BASE_URL, {
       withCredentials: true,
       auth: {
-        token: document.cookie, // temporary
+        token, // temporary
       },
     });
     socket.connect();

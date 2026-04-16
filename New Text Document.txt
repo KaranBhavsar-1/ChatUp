@@ -1,106 +1,16 @@
-error:-
-Access to XMLHttpRequest at 'https://chatup-mz5r.onrender.com/socket.io/?EIO=4&transport=polling&t=hgozqs58' from origin 'https://chatup-1-a7zk.onrender.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
-index-X3eEbZqz.js:195 
- GET https://chatup-mz5r.onrender.com/socket.io/?EIO=4&transport=polling&t=hgozqs58 net::ERR_FAILED 502 (Bad Gateway)
-index-X3eEbZqz.js:195 Uncaught TypeError: Cannot read properties of undefined (reading '69d65194c44a8815958c4bb9')
-    at index-X3eEbZqz.js:195:54175
-    at Array.map (<anonymous>)
-    at yl (index-X3eEbZqz.js:195:53574)
-    at V (index-X3eEbZqz.js:8:47521)
-    at _c (index-X3eEbZqz.js:8:69988)
-    at Nc (index-X3eEbZqz.js:8:80249)
-    at Mu (index-X3eEbZqz.js:8:115603)
-    at ku (index-X3eEbZqz.js:8:114684)
-    at Ou (index-X3eEbZqz.js:8:114522)
-    at gu (index-X3eEbZqz.js:8:111387)
+OPTION 2 — switch to TOKEN IN LOCALSTORAGE (quick fix)
 
-Backend link:- https://chatup-mz5r.onrender.com
-frontend link:-https://chatup-1-a7zk.onrender.com/
+If you want to keep Render setup:
 
-code:-
-Backend:-
+❌ stop using cookies for auth
 
-server.js:-
-import express from "express";
-import cookieParser from "cookie-parser";
-import path from "path";
-import cors from "cors";
+Use JWT in response instead:
 
-import authRoutes from "./routes/auth.route.js";
-import messageRoutes from "./routes/message.route.js";
-import { connectDB } from "./lib/db.js";
-import { ENV } from "./lib/env.js";
-import { app, server } from "./lib/socket.js";
+the whole problem is cookies right????
+ok just tell me step by step how to remove cookies and use localstorage instead
 
-const __dirname = path.resolve();
-
-const PORT = ENV.PORT || 3000;
-
-app.use(express.json({ limit: "5mb" })); // req.body
-app.use(cors({ origin: ENV.CLIENT_URL, credentials: true }));
-app.use(cookieParser());
-
-app.use("/api/auth", authRoutes);
-app.use("/api/messages", messageRoutes);
-
-// make ready for deployment
-if (ENV.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname, "../frontend/dist")));
-
-  app.get("*", (_, res) => {
-    res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
-  });
-}
-
-server.listen(PORT, () => {
-  console.log("Server running on port: " + PORT);
-  connectDB();
-});
-
-authroute.js:-
-import express from "express";
-import { signup, login, logout, updateProfile } from "../controllers/auth.controller.js";
-import { protectRoute } from "../middleware/auth.middleware.js";
-import { arcjetProtection } from "../middleware/arcjet.middleware.js";
-
-const router = express.Router();
-
-router.use(arcjetProtection);
-
-router.post("/signup", signup);
-router.post("/login", login);
-router.post("/logout", logout);
-
-router.put("/update-profile", protectRoute, updateProfile);
-
-router.get("/check", protectRoute, (req, res) => res.status(200).json(req.user));
-
-export default router;
-
-message.route.js:-
-import express from "express";
-import {
-  getAllContacts,
-  getChatPartners,
-  getMessagesByUserId,
-  sendMessage,
-} from "../controllers/message.controller.js";
-import { protectRoute } from "../middleware/auth.middleware.js";
-import { arcjetProtection } from "../middleware/arcjet.middleware.js";
-
-const router = express.Router();
-
-// the middlewares execute in order - so requests get rate-limited first, then authenticated.
-// this is actually more efficient since unauthenticated requests get blocked by rate limiting before hitting the auth middleware.
-router.use(arcjetProtection, protectRoute);
-
-router.get("/contacts", getAllContacts);
-router.get("/chats", getChatPartners);
-router.get("/:id", getMessagesByUserId);
-router.post("/send/:id", sendMessage);
-
-export default router;
-
+my current code:-
+backend:-
 auth.controller.js:-
 import { sendWelcomeEmail } from "../emails/emailHandlers.js";
 import { generateToken } from "../lib/utils.js";
@@ -320,7 +230,7 @@ export const getChatPartners = async (req, res) => {
 
     const chatPartnerIds = [
       ...new Set(
-        messages.map((msg) =>
+        messages?.map((msg) =>
           msg.senderId.toString() === loggedInUserId.toString()
             ? msg.receiverId.toString()
             : msg.senderId.toString()
@@ -334,107 +244,6 @@ export const getChatPartners = async (req, res) => {
   } catch (error) {
     console.error("Error in getChatPartners: ", error.message);
     res.status(500).json({ error: "Internal server error" });
-  }
-};
-
-auth.middleware.js:-
-import jwt from "jsonwebtoken";
-import User from "../models/User.js";
-import { ENV } from "../lib/env.js";
-
-export const protectRoute = async (req, res, next) => {
-  try {
-    const token = req.cookies.jwt;
-    if (!token) return res.status(401).json({ message: "Unauthorized - No token provided" });
-
-    const decoded = jwt.verify(token, ENV.JWT_SECRET);
-    if (!decoded) return res.status(401).json({ message: "Unauthorized - Invalid token" });
-
-    const user = await User.findById(decoded.userId).select("-password");
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    req.user = user;
-    next();
-  } catch (error) {
-    console.log("Error in protectRoute middleware:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-arcjet.middleware.js:-
-import aj from "../lib/arcjet.js";
-import { isSpoofedBot } from "@arcjet/inspect";
-
-export const arcjetProtection = async (req, res, next) => {
-  try {
-    const decision = await aj.protect(req);
-    if (decision.isDenied()) {
-      if (decision.reason.isRateLimit()) {
-        return res.status(429).json({ message: "Rate limit exceeded. please try again later." });
-      } else if (decision.reason.isBot()) {
-        // return res.status(403).json({ message: "Bot access denied!." });
-      } else {
-        return res.status(403).json({ message: "Access denied becase of Security Policy." });
-      }
-    }
-
-    if (decision.results.some(isSpoofedBot)){
-        return res.status(403).json({
-            error: "Spoof Bot detected!",    
-            maessage: "Bot access denied!."
-        });
-    }
-    next();
-  } catch (error) {
-    console.error("Arcjet Protection Error: ", error);
-    next();
-  }
-};
-
-socket.auth.middleware.js:-
-import jwt from "jsonwebtoken";
-import User from "../models/User.js";
-import { ENV } from "../lib/env.js";
-
-export const socketAuthMiddleware = async (socket, next) => {
-  try {
-    // extract token from http-only cookies
-    const token = socket.handshake.headers.cookie
-      ?.split("; ")
-      .find((row) => row.startsWith("jwt="))
-      ?.split("=")[1];
-
-    if (!token) {
-      console.log("Socket connection rejected: No token provided");
-      return next(new Error("Unauthorized - No Token Provided"));
-    }
-
-    // verify the token
-    const decoded = jwt.verify(token, ENV.JWT_SECRET);
-    if (!decoded) {
-      console.log("Socket connection rejected: Invalid token");
-      return next(new Error("Unauthorized - Invalid Token"));
-    }
-
-    // find the user fromdb
-    const user = await User.findById(decoded.userId).select("-password");
-    if (!user) {
-      console.log("Socket connection rejected: User not found");
-      return next(new Error("User not found"));
-    }
-
-    // attach user info to socket
-    socket.user = user;
-    socket.userId = user._id.toString();
-
-    console.log(
-      `Socket authenticated for user: ${user.fullName} (${user._id})`,
-    );
-
-    next();
-  } catch (error) {
-    console.log("Error in socket authentication:", error.message);
-    next(new Error("Unauthorized - Authentication failed"));
   }
 };
 
@@ -476,14 +285,15 @@ import { Server } from "socket.io";
 import http from "http";
 import express from "express";
 import { ENV } from "./env.js";
-import { socketAuthMiddleware } from "../middleware/socket.auth.middleware.js";
+import { socketAuthMiddleware } from "../middleware/socket.Auth.Middleware.js";
 
 const app = express();
 const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: [ENV.CLIENT_URL],
+    // origin: [ENV.CLIENT_URL],
+    origin: "https://chatup-1-a7zk.onrender.com",
     credentials: true,
   },
 });
@@ -532,63 +342,223 @@ export const generateToken = (userId, res) => {
     expiresIn: "7d",
   });
 
-  res.cookie("jwt", token, {
-    maxAge: 7 * 24 * 60 * 60 * 1000, // MS
-    httpOnly: true, // prevent XSS attacks: cross-site scripting
-    sameSite: "strict", // CSRF attacks
-    secure: ENV.NODE_ENV === "development" ? false : true,
-  });
+res.cookie("jwt", token, {
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+  httpOnly: true,
+  sameSite: "none",
+  path: "/", 
+  secure: true,
+});
 
   return token;
 };
 
 // http://localhost
 // https://dsmakmk.com
+arcjet.middleware.js:-
+import aj from "../lib/arcjet.js";
+import { isSpoofedBot } from "@arcjet/inspect";
+
+export const arcjetProtection = async (req, res, next) => {
+  try {
+    const decision = await aj.protect(req);
+    if (decision.isDenied()) {
+      if (decision.reason.isRateLimit()) {
+        return res.status(429).json({ message: "Rate limit exceeded. please try again later." });
+      } else if (decision.reason.isBot()) {
+        // return res.status(403).json({ message: "Bot access denied!." });
+      } else {
+        return res.status(403).json({ message: "Access denied becase of Security Policy." });
+      }
+    }
+
+    if (decision.results.some(isSpoofedBot)){
+        return res.status(403).json({
+            error: "Spoof Bot detected!",    
+            maessage: "Bot access denied!."
+        });
+    }
+    next();
+  } catch (error) {
+    console.error("Arcjet Protection Error: ", error);
+    next();
+  }
+};
+
+auth.middleware.js:-
+import jwt from "jsonwebtoken";
+import User from "../models/User.js";
+import { ENV } from "../lib/env.js";
+
+export const protectRoute = async (req, res, next) => {
+  try {
+    const token = req.cookies.jwt;
+    if (!token) return res.status(401).json({ message: "Unauthorized - No token provided" });
+
+    const decoded = jwt.verify(token, ENV.JWT_SECRET);
+    if (!decoded) return res.status(401).json({ message: "Unauthorized - Invalid token" });
+
+    const user = await User.findById(decoded.userId).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    req.user = user;
+    next();
+  } catch (error) {
+    console.log("Error in protectRoute middleware:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+socket.Auth.Middleware.js:-
+import jwt from "jsonwebtoken";
+import User from "../models/User.js";
+import { ENV } from "../lib/env.js";
+
+export const socketAuthMiddleware = async (socket, next) => {
+  try {
+    // extract token from http-only cookies
+    const token = socket.handshake.auth.token
+      ?.split("; ")
+      .find((row) => row.startsWith("jwt="))
+      ?.split("=")[1];
+
+    if (!token) {
+      console.log("Socket connection rejected: No token provided");
+      return next(new Error("Unauthorized - No Token Provided"));
+    }
+
+    // verify the token
+    const decoded = jwt.verify(token, ENV.JWT_SECRET);
+    if (!decoded) {
+      console.log("Socket connection rejected: Invalid token");
+      return next(new Error("Unauthorized - Invalid Token"));
+    }
+
+    // find the user fromdb
+    const user = await User.findById(decoded.userId).select("-password");
+    if (!user) {
+      console.log("Socket connection rejected: User not found");
+      return next(new Error("User not found"));
+    }
+
+    // attach user info to socket
+    socket.user = user;
+    socket.userId = user._id.toString();
+
+    console.log(
+      `Socket authenticated for user: ${user.fullName} (${user._id})`,
+    );
+
+    next();
+  } catch (error) {
+    console.log("Error in socket authentication:", error.message);
+    next(new Error("Unauthorized - Authentication failed"));
+  }
+};
+
+authroutes.js:-
+import express from "express";
+import { signup, login, logout, updateProfile } from "../controllers/auth.controller.js";
+import { protectRoute } from "../middleware/auth.middleware.js";
+import { arcjetProtection } from "../middleware/arcjet.middleware.js";
+
+const router = express.Router();
+
+router.use(arcjetProtection);
+
+router.post("/signup", signup);
+router.post("/login", login);
+router.post("/logout", logout);
+
+router.put("/update-profile", protectRoute, updateProfile);
+
+router.get("/check", protectRoute, (req, res) => res.status(200).json(req.user));
+
+export default router;
+
+message.route.js:-
+import express from "express";
+import {
+  getAllContacts,
+  getChatPartners,
+  getMessagesByUserId,
+  sendMessage,
+} from "../controllers/message.controller.js";
+import { protectRoute } from "../middleware/auth.middleware.js";
+import { arcjetProtection } from "../middleware/arcjet.middleware.js";
+
+const router = express.Router();
+
+// the middlewares execute in order - so requests get rate-limited first, then authenticated.
+// this is actually more efficient since unauthenticated requests get blocked by rate limiting before hitting the auth middleware.
+router.use(arcjetProtection, protectRoute);
+
+router.get("/contacts", getAllContacts);
+router.get("/chats", getChatPartners);
+router.get("/:id", getMessagesByUserId);
+router.post("/send/:id", sendMessage);
+
+export default router;
+
+server.js:-
+import express from "express";
+import cookieParser from "cookie-parser";
+import path from "path";
+import cors from "cors";
+
+import authRoutes from "./routes/auth.route.js";
+import messageRoutes from "./routes/message.route.js";
+import { connectDB } from "./lib/db.js";
+import { ENV } from "./lib/env.js";
+import { app, server } from "./lib/socket.js";
+
+const __dirname = path.resolve();
+
+const PORT = ENV.PORT || 3000;
+app.set("trust proxy", 1);
+app.use(express.json({ limit: "5mb" })); // req.body
+// app.use(cors({ origin: ENV.CLIENT_URL, credentials: true }));
+app.use(cors({ origin: "https://chatup-1-a7zk.onrender.com" , credentials: true }));
+app.use(cookieParser());
+
+app.use("/api/auth", authRoutes);
+app.use("/api/messages", messageRoutes);
+
+app.get("/debug", (req, res) => {
+  console.log("Cookies:", req.cookies);
+  res.send(req.cookies);
+});
+
+app.get("/", (req, res) => {
+  res.send("NEW VERSION RUNNING");
+});
 
 
-frontend:-
-App.jsx:-
-import { Navigate, Route, Routes } from "react-router";
-import ChatPage from "./pages/ChatPage";
-import LoginPage from "./pages/LoginPage";
-import SignUpPage from "./pages/SignUpPage";
-import { useEffect, useState } from "react";
-import { useAuthStore } from "./store/useAuthStore";
-import PageLoader from "./components/PageLoader";
+// make ready for deployment
+if (ENV.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname, "../frontend/dist")));
 
-import {Toaster} from "react-hot-toast"
-
-function App() {
-  const {checkAuth,isCheckingAuth,authUser} = useAuthStore()
-
-  useEffect(()=>{
-    checkAuth()
-  },[checkAuth])
-
-  console.log({authUser})
-
-  if(isCheckingAuth) return <PageLoader />
-  return (
-    <div className="min-h-screen bg-slare-900 relative flex items-center justify-center p-4 overflow-hidden">
-
-   {/* DECORATORS - GRID BG & GLOW SHAPES */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px]" />
-      <div className="absolute top-0 -left-4 size-96 bg-pink-500 opacity-20 blur-[100px]" />
-      <div className="absolute bottom-0 -right-4 size-96 bg-cyan-500 opacity-20 blur-[100px]" />
-
-
-      <Routes>
-        <Route path="/" element={authUser ? <ChatPage /> : <Navigate to={"/login"}/>} />
-        <Route path="/login" element={!authUser ? <LoginPage />: <Navigate to={"/"}/>} />
-        <Route path="/signup" element={!authUser ?  <SignUpPage /> : <Navigate to={"/"}/>} />
-      </Routes>
-
-      <Toaster/>
-    </div>
-  );
+  app.get("*", (_, res) => {
+    res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
+  });
 }
 
-export default App;
+server.listen(PORT, () => {
+  console.log("Server running on port: " + PORT);
+  connectDB();
+});
+
+Frontend:-
+axios.js:-
+import axios from "axios";
+
+// axios.defaults.withCredentials = true;
+export const axiosInstance = axios.create({
+    // baseURL: import.meta.env.MODE === "development" ? "http://localhost:3000/api" : "/api",
+    // baseURL: import.meta.env.MODE === "development" ? "http://localhost:3000/api" : "https://chatup-mz5r.onrender.com/api",
+    baseURL: "https://chatup-mz5r.onrender.com/api",
+    withCredentials: true,
+})
 
 useAuthStore.js:-
 import { create } from "zustand";
@@ -597,7 +567,7 @@ import toast from "react-hot-toast";
 import { io } from "socket.io-client";
 
 // const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:3000" : "/";
-const BASE_URL = "https://chatup-mz5r.onrender.com"
+const BASE_URL = "https://chatup-mz5r.onrender.com";
 export const useAuthStore = create((set, get) => ({
   authUser: null,
   isCheckingAuth: true,
@@ -637,9 +607,9 @@ export const useAuthStore = create((set, get) => ({
   login: async (data) => {
     set({ isLoggingIn: true });
     try {
-      const res = await axiosInstance.post("/auth/login", data);
+      const res = await axiosInstance.post("/auth/login", data)
       set({ authUser: res.data });
-
+      
       toast.success("Logged in successfully");
 
       get().connectSocket();
@@ -677,10 +647,16 @@ export const useAuthStore = create((set, get) => ({
     const { authUser } = get();
     if (!authUser || get().socket?.connected) return;
 
-    const socket = io(BASE_URL, {
-      withCredentials: true, // this ensures cookies are sent with the connection
-    });
+    // const socket = io(BASE_URL, {
+    //   withCredentials: true, // this ensures cookies are sent with the connection
+    // });
 
+    const socket = io(BASE_URL, {
+      withCredentials: true,
+      auth: {
+        token: document.cookie, // temporary
+      },
+    });
     socket.connect();
 
     set({ socket });
@@ -696,8 +672,7 @@ export const useAuthStore = create((set, get) => ({
   },
 }));
 
-
-usechatstore.js:-
+useChatStore.js:-
 import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
@@ -813,18 +788,9 @@ export const useChatStore = create((set, get) => ({
 }));
 
 
-axios.js:-
-import axios from "axios";
 
-export const axiosInstance = axios.create({
-    // baseURL: import.meta.env.MODE === "development" ? "http://localhost:3000/api" : "/api",
-    // baseURL: import.meta.env.MODE === "development" ? "http://localhost:3000/api" : "https://chatup-mz5r.onrender.com/api",
-    baseURL: "https://chatup-mz5r.onrender.com/api",
-    withCredentials: true,
-})
-﻿
-why am i getting this error???
-and how can i solve it??
-make sure to tell me step by step in simple words
-u can take as much as time u want ,i have a lot of time here , i just want it to be done  accurately.
+frontendlink:-
+https://chatup-1-a7zk.onrender.com
 
+backendlink:- 
+https://chatup-mz5r.onrender.com
