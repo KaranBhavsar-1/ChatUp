@@ -32,9 +32,8 @@ export function createWelcomeEmailTemplate(name, clientURL) {
       
       <p style="margin-bottom: 5px;">If you need any help or have questions, we're always here to assist you.</p>
       <p style="margin-top: 0;">Happy messaging!</p>
-      <p style="margin-top: 0;"> client URL is here: = ${clientURL}</p>
       
-      <p style="margin-top: 25px; margin-bottom: 0;">Best regards,<br>The ChatUp Team</p>
+      <p style="margin-top: 25px; margin-bottom: 0;">Best regards,<br>The Messenger Team</p>
     </div>
     
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">

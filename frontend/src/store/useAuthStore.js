@@ -3,8 +3,8 @@ import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
 
-// const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:3000" : "/";
-const BASE_URL = "https://chatup-mz5r.onrender.com";
+const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:3000" : "/";
+
 export const useAuthStore = create((set, get) => ({
   authUser: null,
   isCheckingAuth: true,
@@ -30,7 +30,6 @@ export const useAuthStore = create((set, get) => ({
     set({ isSigningUp: true });
     try {
       const res = await axiosInstance.post("/auth/signup", data);
-      localStorage.setItem("token", res.data.token);
       set({ authUser: res.data });
 
       toast.success("Account created successfully!");
@@ -45,10 +44,9 @@ export const useAuthStore = create((set, get) => ({
   login: async (data) => {
     set({ isLoggingIn: true });
     try {
-      const res = await axiosInstance.post("/auth/login", data)
-      localStorage.setItem("token", res.data.token);
+      const res = await axiosInstance.post("/auth/login", data);
       set({ authUser: res.data });
-      
+
       toast.success("Logged in successfully");
 
       get().connectSocket();
@@ -86,17 +84,10 @@ export const useAuthStore = create((set, get) => ({
     const { authUser } = get();
     if (!authUser || get().socket?.connected) return;
 
-    // const socket = io(BASE_URL, {
-    //   withCredentials: true, // this ensures cookies are sent with the connection
-    // });
-    const token = localStorage.getItem("token");
-
     const socket = io(BASE_URL, {
-      withCredentials: true,
-      auth: {
-        token, // temporary
-      },
+      withCredentials: true, // this ensures cookies are sent with the connection
     });
+
     socket.connect();
 
     set({ socket });

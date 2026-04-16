@@ -5,10 +5,8 @@ import NoChatsFound from "./NoChatsFound";
 import { useAuthStore } from "../store/useAuthStore";
 
 function ChatsList() {
-  const { getMyChatPartners, chats, isUsersLoading, setSelectedUser } =
-    useChatStore();
+  const { getMyChatPartners, chats, isUsersLoading, setSelectedUser } = useChatStore();
   const { onlineUsers } = useAuthStore();
-  const { unreadMessages } = useChatStore();
 
   useEffect(() => {
     getMyChatPartners();
@@ -26,28 +24,12 @@ function ChatsList() {
           onClick={() => setSelectedUser(chat)}
         >
           <div className="flex items-center gap-3">
-            <div
-              className={`avatar ${onlineUsers.includes(chat._id) ? "online" : "offline"}`}
-            >
-              <div className="size-12 rounded-full border-2">
-                <img
-                  src={chat.profilePic || "/avatar.png"}
-                  alt={chat.fullName}
-                />
+            <div className={`avatar ${onlineUsers.includes(chat._id) ? "online" : "offline"}`}>
+              <div className="size-12 rounded-full">
+                <img src={chat.profilePic || "/avatar.png"} alt={chat.fullName} />
               </div>
             </div>
-            {/* <h4 className="text-slate-200 font-medium truncate">{chat.fullName}</h4> */}
-            <div className="flex items-center justify-between w-full">
-              <h4 className="text-slate-200 font-medium truncate">
-                {chat.fullName}
-              </h4>
-
-              {unreadMessages[chat._id] && (
-                <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                  {unreadMessages[chat._id]}
-                </span>
-              )}
-            </div>
+            <h4 className="text-slate-200 font-medium truncate">{chat.fullName}</h4>
           </div>
         </div>
       ))}
