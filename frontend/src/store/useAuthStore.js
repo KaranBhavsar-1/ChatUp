@@ -34,8 +34,8 @@ export const useAuthStore = create((set, get) => ({
       const res = await axiosInstance.post("/auth/signup", data);
     localStorage.setItem("token", res.data.token);
 
-      set({ authUser: res.data });
-
+      // set({ authUser: res.data });
+      await get().checkAuth();
       toast.success("Account created successfully!");
       get().connectSocket();
     } catch (error) {
