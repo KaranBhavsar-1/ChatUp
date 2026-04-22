@@ -9,11 +9,13 @@ import PageLoader from "./components/PageLoader";
 import { Toaster } from "react-hot-toast";
 
 function App() {
-  const { checkAuth, isCheckingAuth, authUser } = useAuthStore();
+  const { checkAuth, isCheckingAuth, authUser, initAuth } = useAuthStore();
 
+  const hasToken = localStorage.getItem("token");
   useEffect(() => {
+    // initAuth();
     checkAuth();
-  }, [checkAuth]);
+  }, []);
 
   if (isCheckingAuth) return <PageLoader />;
 
@@ -25,9 +27,9 @@ function App() {
       <div className="absolute bottom-0 -right-4 size-96 bg-cyan-500 opacity-20 blur-[100px]" />
 
       <Routes>
-        <Route path="/" element={authUser ? <ChatPage /> : <Navigate to={"/login"} />} />
-        <Route path="/login" element={!authUser ? <LoginPage /> : <Navigate to={"/"} />} />
-        <Route path="/signup" element={!authUser ? <SignUpPage /> : <Navigate to={"/"} />} />
+        <Route path="/" element={hasToken ? <ChatPage /> : <Navigate to={"/login"} />} />
+        <Route path="/login" element={!hasToken ? <LoginPage /> : <Navigate to={"/"} />} />
+        <Route path="/signup" element={!hasToken ? <SignUpPage /> : <Navigate to={"/"} />} />
       </Routes>
 
       <Toaster />
