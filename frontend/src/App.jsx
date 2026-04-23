@@ -27,9 +27,9 @@ function App() {
       <div className="absolute bottom-0 -right-4 size-96 bg-cyan-500 opacity-20 blur-[100px]" />
 
       <Routes>
-        <Route path="/" element={hasToken ? <ChatPage /> : <Navigate to={"/login"} />} />
-        <Route path="/login" element={!hasToken ? <LoginPage /> : <Navigate to={"/"} />} />
-        <Route path="/signup" element={!hasToken ? <SignUpPage /> : <Navigate to={"/"} />} />
+        <Route path="/" element={checkAuth ? <ChatPage /> : <Navigate to={"/login"} />} />
+        <Route path="/login" element={!checkAuth ? <LoginPage /> : <Navigate to={"/"} />} />
+        <Route path="/signup" element={!checkAuth ? <SignUpPage /> : <Navigate to={"/"} />} />
       </Routes>
 
       <Toaster />
