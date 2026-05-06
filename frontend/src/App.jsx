@@ -10,7 +10,7 @@ import { Toaster } from "react-hot-toast";
 
 function App() {
   const { checkAuth, isCheckingAuth, authUser, initAuth } = useAuthStore();
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const hasToken = localStorage.getItem("token");
   useEffect(() => {
     // initAuth();
